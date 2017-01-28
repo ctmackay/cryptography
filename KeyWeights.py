@@ -1,4 +1,6 @@
 ﻿import alpha
+# tools to turn a plaintext key into a numerical key. 
+# used for columnar transposition 
 
 class KeyChar(object):
     def __init__(self,l,pos,w):

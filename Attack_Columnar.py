@@ -1,6 +1,6 @@
 import itertools
 import CryptMatrixTools as cmt
-import Decrypt
+import Decrypt_Columnar as Decrypt
 import random
 #import math
 from copy import deepcopy
@@ -33,6 +33,14 @@ def generateRandomKey(key_length):
         key_seed.append(i)
     random.shuffle(key_seed) #randomize
     return key_seed
+
+# check if key is already in the list.
+# faster than rescoring every key 
+def contains(keylist, filter):
+    for keyobject in keylist:
+        if keyobject.key == filter:
+            return True
+    return False; #could not find key
 
 
 def bruteForceAttack(cipher_text,key):
@@ -69,28 +77,38 @@ def getCipherTextDividers(ct_length,max_key_length):
 
     return possible_lengths
 
-def geneticAlgorithmAttack(cipher_text,key_length,max_iterations,isEnglish):
-    universal_set = generateRandomKey(key_length)
+
+# function to crack columnar transposition cipher by keeping the fittest keys.
+# high fitness is a score that has high similiarity to the digram frequency matrix in the encoded language
+def geneticAlgorithmAttack(cipher_text, key_length, max_iterations, isEnglish):
+    universal_set = set(generateRandomKey(key_length))
     generation=[] # empty list of key objects with key value and score
+
     #build a pool of N random keys
     N = key_length * 30
     for i in range(0,N):
         #rand_key_length = random.randint(min_key_length,max_key_length)
         rand_key = generateRandomKey(key_length)
         kso = KeyScore(rand_key,0) # add our new key to the list, with inital score of 0
-        if kso not in generation:
-            generation.append(kso)
+        #if not contains(generation,rand_key): #unique keys only
+        generation.append(kso)
+
+
+    #choose which scoring function we will be using
     if isEnglish:
         E = cmt.getE()
     else:
         E = cmt.getGermanE()
+
+
     genNumber=1
     while genNumber < max_iterations:
         for k in generation:
-            if k.score == 0:
+            if k.score == 0: # if the score is 0, we need to rescore
                 putative_text = Decrypt.decryptMyText(cipher_text,k.key,False)
                 D = cmt.getD(putative_text)
                 k.updateScore(cmt.scoreFunction(D,E))
+                #print k.key,k.score
 
         generation_sorted = sorted(generation, key = lambda ko: ko.score,reverse=False) # sort the list based on best scores
     
@@ -98,28 +116,28 @@ def geneticAlgorithmAttack(cipher_text,key_length,max_iterations,isEnglish):
         #max=int(len(generation_sorted)*0.25)
         top_surviving = []
         top_surviving = generation_sorted[:N]
-        generation[:] = []# top_surviving #clear out the old gen, and fill in the new parents+children
+        generation[:] = [] #clear out the old gen, and fill in the new parents+children
+        generation = top_surviving[:]
+
         for i in range(0,len(top_surviving)):
             parent1 = top_surviving[i].key # take the parents keys
             #parent2 = top_surviving[i+1].key
             pivot_point = random.randint(0,key_length) #find a pivot point for generation of new child
-            child = parent1[:pivot_point]
+            child = parent1[:pivot_point] # take a portion of the key from parent 1
 
-            #spawn a new child
-            while len(child) < key_length:
-                parent2 = list(set(universal_set) - set(child))  # take only from parent2 what is not already in child
-                parent_num = random.choice(parent2)
-                if (parent_num not in child):
-                    child.append(parent_num)
-            if top_surviving[i] not in generation:
-                generation.append(top_surviving[i]) # add the parents back in the pool
-           # if top_surviving[i+1] not in generation:
-             #   generation.append(top_surviving[i+1])
-            if child not in generation:
+
+            #spawn a new child using a mutation of missing parts
+            parent2 = list(universal_set - set(child))  # take only from parent2 what is not already in child
+            random.shuffle(parent2) # scramble DNA
+            child = child + parent2 # create new children using mutated key DNA
+            assert (len(child) == key_length), "Child key has incorrect length"
+
+            if not contains(generation,child): # only add if child is unique
                 generation.append(KeyScore(child,0)) #add the new child  in the pool
 
         genNumber+=1
-    #for the last generation
+
+    #for the last generation, score and sort 1 more time. 
     if genNumber == max_iterations:
         for k in generation:
             if k.score == 0:
@@ -127,29 +145,35 @@ def geneticAlgorithmAttack(cipher_text,key_length,max_iterations,isEnglish):
                 D = cmt.getD(putative_text)
                 k.updateScore(cmt.scoreFunction(D,E))
         generation_sorted = sorted(generation, key = lambda ko: ko.score,reverse=False) # sort the list based on best scores
-    return generation_sorted[0:10] #return top 5 best keys
+
+    return generation_sorted[0:10] #return top 10 best keys
 
 def main():
-    with open(r'C:\Users\Charl\Dropbox\Graduate School\SJSU 2016\Fall 2016\CS 265\project\scripts\text files\my_crypt.txt') as f:
-        mole1 = f.read()
-    #cipher_text = 'ENEAC DBCTE NCOSH MTCGO TENAE EOEHT OTESO AGOTC TUOEB IMSSE EARTN TIYEW WOOGE EENEW PICNI NOSES TUAPM RUAKN RHMSF RNRCT ESAEF EDODO HDCOH CIHRO VRLDW EENYN ANBIS CDHLD UMUEO YLIIY AATBR SALEE TAOCN CGNOA IHESR SHFNS NBSTT ALEEO ENOAM ODEEE IMITI AHEHD TNTTA OARET MIFIT GOAOE ORRLT ILNDE AHTOE NIETD DNTTH AOERT INEOR LIWTB LNWOT DFWIC KNNNL LTLTY LDTOC DLEED MGGID SLSLD BITTB PTLRA OAEWE LDTVT DSNAN CINNE YLEAE HANTU HOWAN EASNE PHIUF LSDTD AELIT OICEB SSAHI OEAMO EEHEN TATIL NRTPD SHBST TOANE TROER ENEFS MNHNV TMRED CETMH HSOEC OGAAN UNWRO RIHDO SEOAE TTCDP TGIDR PPTLE OOAON OLATM REEAA LTICG EIANC YNATR EYNET AEGIR WDNSH YENEE RWSNF NPNUE UNYIE OHLAO TLLDH LTMIF KTFEH UVNNA VATON OCLNS LSRNC SCNIN DAATT DORHE ORLTF SEFFG AAOIE DDSTS YSCSA RNASV DLHIH DRRDE DHANW NTINR UWFDE EHMCD TSREH PTMNR IEASI WELMR EHMPO NIETA TOONL UHITE LHEDD INOHO HEEJS MOECD CAOTI NOTIO YIETM HEREL EYTNA HWAHY ETETP NELND LRWIR DAENC ONERO VDRCH DRSEN MAEOA HIYWY RANNH CEETT EETTL ETISI COOUH MCDIE EEBAE UHRMR DGHCM NESEG LYHEE EHCDH UPEEH HHRHR ORRNM REISH TWBRO RWIAL NEAOA TERNR DHCHS SRTTT WHSRR TMETN LGGGU IIWHT NAMSL NODNE ETTAG DRHNL RDOSA RAFOM HMIES AYNEA ASIAS OEASO UTEOE IOENS LFNME RNKCP EETAP LSRHS NUCEW OUTTE OOSMA TSWHU DWDNT RNMRS FTAON NDAAI AHMDE SUMOV OASAR EIAOE ILERN ETTDE WTTET MAQOE EREEC RNADC TBNTN NONET AEEIA ABTOH BESOS AYARM GEAHW TNRHE ADNAC ADNBI RNEHG DEOAO ACARE WDRTU EOKSA DDBAR PCHTN STXLA RTPDM REORI HDOEA ATENK PDRIW AAOSE OEMER HOLEW SFLBO NHBEO TEAUY OETMF PRENT OIBUN STEEM DENI'
+    #with open(r'C:\Users\Charl\Dropbox\Graduate School\SJSU 2016\Fall 2016\CS 265\project\scripts\text files\my_crypt.txt') as f:
+        #mole1 = f.read()
+
+    cipher_text = 'ARLWT HSLAN LZEHE TBEAT NEAZG SYLCI NHPYN ZOAPO HTDIL IAZTP OSTLR MSORE KTYDE HRIAH YZERL LUWAW NLEZE EROAI RIDIR ZHENA OLHSI NPALE AEHTO EYTTZ'
     #cipher_text = 'EVLNE ACDTK ESEAQ ROFOJ DEECU WIREE'
-    cipher_text = cmt.cleanText(mole1,False)
+    #cipher_text = cmt.cleanText(mole1,False)
     print cipher_text
     print len(cipher_text)
     #print getCipherTextDividers(len(cipher_text),100)
-    for i in range(5,7):
-        keyz = geneticAlgorithmAttack(cipher_text,i,100,True)
-        for k in keyz:
-            print k.key, k.score
-            print Decrypt.decryptMyText(cipher_text,k.key,False)
 
-    i = 0
+
+    key_len = len('LONGKEYLEN') # cheating to get the key length
+
+    #for i in range(5,5):
+    keyz = geneticAlgorithmAttack(cipher_text,key_len,100,True) # 100-1000 iterations seems ok. when you have too many iterations, the score goes lower, but the real answer might be higher.
     for k in keyz:
         print k.key, k.score
         print Decrypt.decryptMyText(cipher_text,k.key,False)
-        i=i+1
-        if i >10:
-            break
+
+    #i = 0
+    #for k in keyz:
+    #    print k.key, k.score
+    #    print Decrypt.decryptMyText(cipher_text,k.key,False)
+    #    i=i+1
+    #    if i >10:
+    #        break
 
 main()

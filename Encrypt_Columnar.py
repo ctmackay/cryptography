@@ -41,7 +41,7 @@ def buildTransMatrix(key,plain_text):
         for j in range(0,len(key)): #iterate through the entire row
             if k >= msg_len: #if we've run out of text for that row, put a null character
                 flag = True #this means we're done building the matrix
-                f_array[i,j]='&' 
+                f_array[i,j]='Z' # null character 
             else:
                 f_array[i,j]=plain_text[k]
                 k=k+1
@@ -70,16 +70,22 @@ def encryptPlaintext(plain_text,key,useNull):
 
 # main starting point
 def main():
+
+    plain_text = 'The goalkeepers are the only players allowed to touch the ball with their hands or arms while it is in play and only in their penalty area'
     #plain_text = 'WE ARE DISCOVERED. FLEE AT ONCE'
+
     key = 'LONGKEYLEN'
-    fromFile = True
+
+    fromFile = False
     filename = r"C:\Users\Charl\Dropbox\Graduate School\SJSU 2016\Fall 2016\CS 265\project\scripts\text files\my_text2.txt"
+
+
     if fromFile:
         with open(filename,'r') as f:
             plain_text = f.read()
    
     print plain_text
     print key
-    print encryptPlaintext(plain_text,key,False)
+    print encryptPlaintext(plain_text,key,True)
 #execute main
-#main()
+main()

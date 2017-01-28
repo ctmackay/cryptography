@@ -1,5 +1,4 @@
 ﻿# Charles MacKay
-# Abhinaya
 # python scripts to do matrix operations
 
 import numpy as np

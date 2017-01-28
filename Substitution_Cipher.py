@@ -1,7 +1,6 @@
 ﻿# Simple mono-alphabetic substituion cipher 
 # key consists of a 26 letter mapping (one to one)
-# Charles MacKay & Abhinaya 
-# cs 265
+# Charles MacKay  (charlestmackay@gmail.com)
 
 import alpha
 import CryptMatrixTools as cmt
@@ -11,7 +10,6 @@ import copy
 import numpy as np
 import time
 
-MAX_ITERATIONS = 1000
 
 def encrypt(plain_text,key):
     plain_text = cmt.cleanText(plain_text,False) #remove punctutation and non alpha chars
@@ -98,7 +96,7 @@ def generateRandomKey():
     random.shuffle(key_list)
     return key_list
 
-def geneticAlgorithmAttack(cipher_text):
+def geneticAlgorithmAttack(cipher_text, iterations):
     key = genKeyBasedOnLetterFreq(letterFrequencyAnalysis(cipher_text))
     #key = generateRandomKey()
     print "inital guess for key",key
@@ -109,16 +107,20 @@ def geneticAlgorithmAttack(cipher_text):
     print "inital score from decryption with key", score
     print "inital decryption with key", decrypted_text
     i = 0
-    while i < MAX_ITERATIONS:
+    while i < iterations:
         i=i+1
         tempkey = copy.deepcopy(key)
+        Dp = np.copy(D)
+
         a = random.randint(0,25)
         b = random.randint(0,25)
         tempkey[a],tempkey[b] = tempkey[b],tempkey[a] # Swap element a and b in tempkey.
-        decrypted_text = decrypt(cipher_text,tempkey) # Decrypt and score
-        D = cmt.getD(decrypted_text)
-        newscore = cmt.scoreFunction(D,E)
+        cmt.swapRows(Dp,a,b) #swap rows and columns in the D' matrix
+        cmt.swapColumns(Dp,a,b)
+        newscore = cmt.scoreFunction(Dp,E) #score with new D'
+
         if newscore < score:
+            D = np.copy(Dp)
             key = copy.deepcopy(tempkey) # if improved, save permutation
             score = newscore
 
@@ -165,81 +167,6 @@ def jakobsenAttack(cipher_text):
     decrypted_text = decrypt(cipher_text,key)
     return decrypted_text
 
-def SSCTJakobsen(cipher_text,D,key):
-    # indices in my key
-    a = 0 
-    b = 0
-    #key = genKeyBasedOnLetterFreq(letterFrequencyAnalysis(cipher_text)) #Get initial Key based on letter frequencies in the ciphertext.
-    print "inital guess for key",key
-    E = cmt.getE() #Construct E matrix based on English language text
-    decrypted_text = decrypt(cipher_text,key) #Decrypt the ciphertext with the putative key and construct D matrix
-    D = cmt.getD(decrypted_text)
-    score = cmt.scoreFunction(D,E)
-    print "inital score from decryption with key", score
-
-    while b != 25:
-        if (a+b) <= 25:
-            tempkey = copy.deepcopy(key)
-            Dp = np.copy(D)
-            tempkey[a],tempkey[b] = tempkey[b],tempkey[a] # Swap element a and b in tempkey.
-            cmt.swapRows(Dp,a,b) #swap rows and columns in the D' matrix
-            cmt.swapColumns(Dp,a,b)
-            newscore = cmt.scoreFunction(Dp,E) #score with new D'
-            if newscore < score:
-                score = newscore
-                key = copy.deepcopy(tempkey)
-                D = np.copy(Dp)
-                a=0
-                b=0
-            else:
-                tempkey = copy.deepcopy(key)
-                Dp = np.copy(D)
-                a = a+1
-        else:
-            a=0
-            b=b+1
-            tempkey = copy.deepcopy(key)
-            Dp = np.copy(D)
-
-    decrypted_text = decrypt(cipher_text,key)
-    return decrypted_text,tempkey,score
-
-def generalHillClimbAttack(cipher_text):
-    # indices in my key
-    a = 0 
-    b = 0
-    key = genKeyBasedOnLetterFreq(letterFrequencyAnalysis(cipher_text)) #Get initial 𝑘𝑒𝑦 based on letter frequencies in the ciphertext.
-    print "inital guess for key",key
-    E = cmt.getE() #Construct 𝐸 matrix based on English language text
-    decrypted_text = decrypt(cipher_text,key) #Decrypt the ciphertext with the putative key and construct 𝐷 matrix
-    D = cmt.getD(decrypted_text)
-    score = cmt.scoreFunction(D,E)
-    print "inital score from decryption with key", score
-
-    while b != 25:
-        if (a+b) <= 25:
-            tempkey = copy.deepcopy(key)
-            tempkey[25-a],tempkey[25-b] = tempkey[25-b],tempkey[25-a] # Swap element a and b in tempkey.
-            #Decrypt and score with tempkey.
-            decrypted_text = decrypt(cipher_text,tempkey) 
-            D = cmt.getD(decrypted_text)
-            newscore = cmt.scoreFunction(D,E)
-            if newscore < score:
-                score = newscore
-                key = copy.deepcopy(tempkey)
-                a=0
-                b=0
-            else:
-                tempkey = copy.deepcopy(key)
-                a = a+1
-        else:
-            a=0
-            b=b+1
-            tempkey = copy.deepcopy(key)
-
-    print key,score
-    decrypted_text = decrypt(cipher_text,key)
-    print decrypted_text
 
 def main():
     #plain_text = 'thisistotestthesimplesubstitutioncipher'
@@ -247,18 +174,17 @@ def main():
     key = ['K', 'M', 'J', 'Y', 'X', 'A', 'I', 'B', 'R', 'F', 'L', 'T', 'H', 'E', 'O', 'U', 'W', 'D', 'V', 'G', 'S', 'Q', 'P', 'N', 'C', 'Z']
     #print key
 
-
+    # sample plain text. 
     plain_text = 'A letter. For me. That was something of an event. The crisp-cornered envelope, puffed up with its thickly folded contents, was addressed in a hand that must have given the postman a certain amount of trouble. Although the style of the writing was old-fashioned, with its heavily embellished capitals and curly flourishes, my first impression was that it had been written by a child. The letters seemed untrained. Their uneven strokes either faded into nothing or were heavily etched into the paper.'
-    plain_text = cmt.cleanText(plain_text,False)
-    plain_text = plain_text.upper()
-    print plain_text
-    print len(plain_text)
-    cipher_text = encrypt(plain_text,key)
-    print cipher_text
-    print cmt.scoreFunction(cmt.getD(plain_text),cmt.getE())
+    plain_text = cmt.cleanText(plain_text,False) #clean up, remove punctuations
+    plain_text = plain_text.upper() # convert to caps
+    print 'plaintext', plain_text 
+    print 'length of text', len(plain_text)
 
-    key = generateRandomKey()
-    
+    cipher_text = encrypt(plain_text,key) # encrypt plaintext using key
+    print 'encrypted text', cipher_text
+    print 'digram frequency score', cmt.scoreFunction(cmt.getD(plain_text),cmt.getE()) # print score of actual text
+
 
     #analyzed_text = letterFrequencyAnalysis(cipher_text)
     #listOccurances(analyzed_text,len(cipher_text))
@@ -273,10 +199,10 @@ def main():
     #generalHillClimbAttack(cipher_text)
     #print ('general hill climb attack took %s seconds'%(time.time() - start_time))
 
-    #geneticAlgorithmAttack(cipher_text)
-
+    print '\n\nperforming attack...\n'
+    # perform attack and time
     start_time = time.time()
-    #for i in range(0,10):
+    #print geneticAlgorithmAttack(cipher_text, 2000)
     print jakobsenAttack(cipher_text)
     print ('jackobsen attack took %s seconds'%(time.time() - start_time))
 main()
